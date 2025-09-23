@@ -4,10 +4,11 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
-	"one-api/common"
-	"one-api/controller"
 	"os"
 	"strings"
+
+	"one-api/common"
+	"one-api/controller"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,7 @@ func SetRouter(router *gin.Engine, buildFS embed.FS, indexPage []byte) {
 	SetDashboardRouter(router)
 	SetRelayRouter(router)
 	SetVideoRouter(router)
+	SetAsyncImageRouter(router)
 
 	// 添加重定向路由处理编码的链接
 	router.GET("/redirect/:encoded", controller.RedirectHandler)

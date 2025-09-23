@@ -13,6 +13,7 @@ const (
 
 	TaskActionGenerate     = "generate"
 	TaskActionTextGenerate = "textGenerate"
+	TaskActionImageGenerate = "imageGenerate"
 )
 
 var SunoModel2Action = map[string]string{
