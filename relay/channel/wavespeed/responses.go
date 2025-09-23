@@ -1,6 +1,7 @@
 package wavespeed
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -49,12 +50,12 @@ func (rh *ResponseHandler) HandleResponse(resp *http.Response, modelPath string)
 	// Parse WaveSpeed response
 	wavespeedResp, err := rh.parseWavespeedResponse(resp)
 	if err != nil {
-		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed)
+		return nil, types.NewI18nError(context.Background(), err, types.ErrorCodeDoRequestFailed)
 	}
 
 	// Check for API-level errors
 	if wavespeedResp.Error != "" {
-		return nil, types.NewError(errors.New(wavespeedResp.Error), types.ErrorCodeDoRequestFailed)
+		return nil, types.NewI18nError(context.Background(), errors.New(wavespeedResp.Error), types.ErrorCodeDoRequestFailed)
 	}
 
 	// Convert to OpenAI format based on model type
@@ -96,7 +97,7 @@ func (rh *ResponseHandler) convertImageResponse(wavespeedResp *WavespeedResponse
 	if wavespeedResp.Status == "processing" || wavespeedResp.Status == "created" {
 		content = "Image generation is in progress. Task ID: " + wavespeedResp.ID
 	} else if wavespeedResp.Status == "failed" {
-		return nil, types.NewError(errors.New("image generation failed"), types.ErrorCodeDoRequestFailed)
+		return nil, types.NewI18nError(context.Background(), errors.New("image generation failed"), types.ErrorCodeDoRequestFailed)
 	}
 
 	openaiResponse := &dto.OpenAITextResponse{
@@ -147,7 +148,7 @@ func (rh *ResponseHandler) convertVideoResponse(wavespeedResp *WavespeedResponse
 	if wavespeedResp.Status == "processing" || wavespeedResp.Status == "created" {
 		content = "Video generation is in progress. Task ID: " + wavespeedResp.ID
 	} else if wavespeedResp.Status == "failed" {
-		return nil, types.NewError(errors.New("video generation failed"), types.ErrorCodeDoRequestFailed)
+		return nil, types.NewI18nError(context.Background(), errors.New("video generation failed"), types.ErrorCodeDoRequestFailed)
 	}
 
 	openaiResponse := &dto.OpenAITextResponse{
@@ -183,10 +184,10 @@ func (rh *ResponseHandler) handleErrorResponse(resp *http.Response) *types.NewAP
 	var errorResp WavespeedErrorResponse
 	err := json.NewDecoder(resp.Body).Decode(&errorResp)
 	if err != nil {
-		return types.NewError(errors.New("failed to parse error response"), types.ErrorCodeDoRequestFailed)
+		return types.NewI18nError(context.Background(), errors.New("failed to parse error response"), types.ErrorCodeReadResponseBodyFailed)
 	}
 
-	return types.NewError(errors.New(errorResp.Error.Message), rh.mapHTTPStatusToErrorCode(resp.StatusCode))
+	return types.NewI18nError(context.Background(), errors.New(errorResp.Error.Message), rh.mapHTTPStatusToErrorCode(resp.StatusCode))
 }
 
 // Helper methods

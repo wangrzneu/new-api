@@ -3,12 +3,13 @@ package model
 import (
 	"context"
 	"fmt"
-	"one-api/common"
-	"one-api/logger"
-	"one-api/types"
 	"os"
 	"strings"
 	"time"
+
+	"one-api/common"
+	"one-api/logger"
+	"one-api/types"
 
 	"github.com/gin-gonic/gin"
 
@@ -317,6 +318,13 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
+type TokenStat struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+	RequestCount     int `json:"request_count"`
+}
+
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
@@ -363,8 +371,18 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	return stat
 }
 
-func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {
-	tx := LOG_DB.Table("logs").Select("ifnull(sum(prompt_tokens),0) + ifnull(sum(completion_tokens),0)")
+func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) TokenStat {
+	var stat TokenStat
+
+	// 构建查询，统计 prompt_tokens, completion_tokens, 总数和调用次数
+	tx := LOG_DB.Table("logs").Select(
+		"ifnull(sum(prompt_tokens),0) as prompt_tokens, " +
+			"ifnull(sum(completion_tokens),0) as completion_tokens, " +
+			"ifnull(sum(prompt_tokens),0) + ifnull(sum(completion_tokens),0) as total_tokens, " +
+			"count(*) as request_count",
+	)
+
+	// 应用过滤条件
 	if username != "" {
 		tx = tx.Where("username = ?", username)
 	}
@@ -380,8 +398,14 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	if modelName != "" {
 		tx = tx.Where("model_name = ?", modelName)
 	}
-	tx.Where("type = ?", LogTypeConsume).Scan(&token)
-	return token
+
+	// 只统计消费类型的日志
+	tx = tx.Where("type = ?", LogTypeConsume)
+
+	// 执行查询
+	tx.Scan(&stat)
+
+	return stat
 }
 
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
