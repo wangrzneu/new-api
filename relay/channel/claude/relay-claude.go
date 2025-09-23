@@ -646,6 +646,8 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 			} else if claudeResponse.Type == "message_delta" {
 			}
 		}
+		// 应用链接替换
+		data = relaycommon.ApplyLinkReplacement(data)
 		helper.ClaudeChunkData(c, claudeResponse, data)
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		response := StreamResponseClaude2OpenAI(requestMode, &claudeResponse)
@@ -753,6 +755,9 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 	if claudeResponse.Usage.ServerToolUse != nil && claudeResponse.Usage.ServerToolUse.WebSearchRequests > 0 {
 		c.Set("claude_web_search_requests", claudeResponse.Usage.ServerToolUse.WebSearchRequests)
 	}
+
+	// 应用链接替换
+	responseData = relaycommon.ApplyLinkReplacementToBytes(responseData)
 
 	service.IOCopyBytesGracefully(c, httpResp, responseData)
 	return nil

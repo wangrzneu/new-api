@@ -159,6 +159,11 @@ export const CHANNEL_OPTIONS = [
     color: 'purple',
     label: 'Vidu',
   },
+  {
+    value: 53,
+    color: 'blue',
+    label: 'WaveSpeed',
+  },
 ];
 
 export const MODEL_TABLE_PAGE_SIZE = 10;

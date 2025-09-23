@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"one-api/common"
+	"one-api/controller"
 	"os"
 	"strings"
 
@@ -16,6 +17,9 @@ func SetRouter(router *gin.Engine, buildFS embed.FS, indexPage []byte) {
 	SetDashboardRouter(router)
 	SetRelayRouter(router)
 	SetVideoRouter(router)
+
+	// 添加重定向路由处理编码的链接
+	router.GET("/redirect/:encoded", controller.RedirectHandler)
 	frontendBaseUrl := os.Getenv("FRONTEND_BASE_URL")
 	if common.IsMasterNode && frontendBaseUrl != "" {
 		frontendBaseUrl = ""

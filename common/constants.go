@@ -200,3 +200,7 @@ const (
 	TopUpStatusSuccess = "success"
 	TopUpStatusExpired = "expired"
 )
+
+// Link replacement configuration
+var LinkReplacementEnabled = false
+var ReplacementDomain = ""

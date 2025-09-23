@@ -32,6 +32,9 @@ func sendStreamData(c *gin.Context, info *relaycommon.RelayInfo, data string, fo
 		return nil
 	}
 
+	// 应用链接替换
+	data = relaycommon.ApplyLinkReplacement(data)
+
 	if !forceFormat && !thinkToContent {
 		return helper.StringData(c, data)
 	}
@@ -249,6 +252,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		}
 		responseBody = geminiRespStr
 	}
+
+	// 应用链接替换
+	responseBody = relaycommon.ApplyLinkReplacementToBytes(responseBody)
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
@@ -595,6 +601,9 @@ func OpenaiHandlerWithUsage(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+
+	// 应用链接替换
+	responseBody = relaycommon.ApplyLinkReplacementToBytes(responseBody)
 
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)

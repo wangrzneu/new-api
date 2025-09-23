@@ -32,6 +32,7 @@ import (
 	"one-api/relay/channel/tencent"
 	"one-api/relay/channel/vertex"
 	"one-api/relay/channel/volcengine"
+	"one-api/relay/channel/wavespeed"
 	"one-api/relay/channel/xai"
 	"one-api/relay/channel/xunfei"
 	"one-api/relay/channel/zhipu"
@@ -101,6 +102,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &coze.Adaptor{}
 	case constant.APITypeJimeng:
 		return &jimeng.Adaptor{}
+	case constant.APITypeWavespeed:
+		return &wavespeed.Adaptor{}
 	case constant.APITypeMoonshot:
 		return &moonshot.Adaptor{} // Moonshot uses Claude API
 	}
