@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"strconv"
+
 	"one-api/constant"
 	"one-api/relay/channel"
 	"one-api/relay/channel/ali"
@@ -24,8 +26,12 @@ import (
 	"one-api/relay/channel/palm"
 	"one-api/relay/channel/perplexity"
 	"one-api/relay/channel/siliconflow"
+	imageTaskWavespeed "one-api/relay/channel/task/image/wavespeed"
+	taskWavespeed "one-api/relay/channel/task/wavespeed"
+
 	taskjimeng "one-api/relay/channel/task/jimeng"
 	"one-api/relay/channel/task/kling"
+	taskMiniMax "one-api/relay/channel/task/minimax"
 	"one-api/relay/channel/task/suno"
 	taskvertex "one-api/relay/channel/task/vertex"
 	taskVidu "one-api/relay/channel/task/vidu"
@@ -37,7 +43,6 @@ import (
 	"one-api/relay/channel/xunfei"
 	"one-api/relay/channel/zhipu"
 	"one-api/relay/channel/zhipu_4v"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -135,6 +140,20 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 			return &taskvertex.TaskAdaptor{}
 		case constant.ChannelTypeVidu:
 			return &taskVidu.TaskAdaptor{}
+		case constant.ChannelTypeMiniMax:
+			return &taskMiniMax.TaskAdaptor{}
+		case constant.ChannelTypeWavespeed:
+			return &taskWavespeed.TaskAdaptor{}
+		}
+	}
+	return nil
+}
+
+func GetImageTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
+	if channelType, err := strconv.ParseInt(string(platform), 10, 64); err == nil {
+		switch channelType {
+		case constant.ChannelTypeWavespeed:
+			return &imageTaskWavespeed.TaskAdaptor{}
 		}
 	}
 	return nil

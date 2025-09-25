@@ -52,10 +52,6 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	if !isValidModel(info.UpstreamModelName) {
-		return "", fmt.Errorf("unsupported model: %s", info.UpstreamModelName)
-	}
-
 	endpoint := getModelEndpoint(info.UpstreamModelName)
 	return fmt.Sprintf("%s%s", a.baseURL, endpoint), nil
 }
@@ -97,20 +93,20 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
-	var wsResp WavespeedResponse
-	err = json.Unmarshal(responseBody, &wsResp)
+	unifiedResponse, err := convertToUnifiedResponse(responseBody)
 	if err != nil {
-		taskErr = service.TaskErrorWrapper(err, "unmarshal_response_failed", http.StatusInternalServerError)
+		taskErr = service.TaskErrorWrapper(err, "convert_to_unified_response_failed", http.StatusInternalServerError)
 		return
 	}
 
-	if wsResp.Status != "created" && wsResp.Status != "processing" {
-		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf("task failed with status: %s", wsResp.Status), "task_failed", http.StatusBadRequest)
+	data, err := json.Marshal(unifiedResponse.Data)
+	if err != nil {
+		taskErr = service.TaskErrorWrapper(err, "marshal_task_data_failed", http.StatusInternalServerError)
 		return
 	}
 
-	c.JSON(http.StatusOK, wsResp)
-	return wsResp.ID, responseBody, nil
+	c.JSON(http.StatusOK, unifiedResponse)
+	return unifiedResponse.Data.TaskID, data, nil
 }
 
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any) (*http.Response, error) {
@@ -147,23 +143,23 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	taskInfo.TaskID = resPayload.ID
+	taskInfo.TaskID = resPayload.Data.ID
 
-	switch resPayload.Status {
+	switch resPayload.Data.Status {
 	case "created":
 		taskInfo.Status = model.TaskStatusSubmitted
 	case "processing":
 		taskInfo.Status = model.TaskStatusInProgress
 	case "completed":
 		taskInfo.Status = model.TaskStatusSuccess
-		if len(resPayload.Outputs) > 0 {
-			taskInfo.Url = resPayload.Outputs[0]
+		if len(resPayload.Data.Outputs) > 0 {
+			taskInfo.Url = resPayload.Data.Outputs[0]
 		}
 	case "failed":
 		taskInfo.Status = model.TaskStatusFailure
 		taskInfo.Reason = "Task failed"
 	default:
-		return nil, fmt.Errorf("unknown task status: %s", resPayload.Status)
+		return nil, fmt.Errorf("unknown task status: %s", resPayload.Data.Status)
 	}
 
 	return taskInfo, nil
@@ -182,26 +178,55 @@ type WavespeedRequest struct {
 }
 
 type WavespeedResponse struct {
-	ID              string            `json:"id"`
-	Model           string            `json:"model"`
-	Status          string            `json:"status"`
-	CreatedAt       string            `json:"created_at"`
-	Outputs         []string          `json:"outputs"`
-	HasNsfwContents []bool            `json:"has_nsfw_contents"`
-	URLs            map[string]string `json:"urls"`
+	Data struct {
+		ID              string            `json:"id"`
+		Model           string            `json:"model"`
+		Status          string            `json:"status"`
+		CreatedAt       string            `json:"created_at"`
+		Outputs         []string          `json:"outputs"`
+		HasNsfwContents []bool            `json:"has_nsfw_contents"`
+		URLs            map[string]string `json:"urls"`
+	} `json:"data"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type UnifiedResponse struct {
+	TaskID string `json:"task_id"`
+	Data   struct {
+		TaskID string `json:"task_id"`
+	} `json:"data"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func convertToUnifiedResponse(respBody []byte) (*UnifiedResponse, error) {
+	var wsResp WavespeedResponse
+	err := json.Unmarshal(respBody, &wsResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	unifiedResp := UnifiedResponse{
+		TaskID: wsResp.Data.ID,
+		Data: struct {
+			TaskID string `json:"task_id"`
+		}{
+			TaskID: wsResp.Data.ID,
+		},
+		Code:    wsResp.Code,
+		Message: wsResp.Message,
+	}
+
+	return &unifiedResp, nil
 }
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, modelName string) (*WavespeedRequest, error) {
 	payload := &WavespeedRequest{
-		Prompt:            req.Prompt,
-		Image:             req.Image,
-		NegativePrompt:    "",
-		Size:              a.convertSize(req.Size),
-		Duration:          5,
-		NumInferenceSteps: 30,
-		GuidanceScale:     5.0,
-		FlowShift:         3.0,
-		Seed:              -1,
+		Prompt:   req.Prompt,
+		Image:    req.Image,
+		Size:     req.Size,
+		Duration: req.Duration,
 	}
 
 	// Parse metadata for additional parameters
@@ -237,19 +262,6 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, mo
 	}
 
 	return payload, nil
-}
-
-func (a *TaskAdaptor) convertSize(size string) string {
-	switch size {
-	case "1024x1024", "512x512":
-		return "832*480"
-	case "1280x720", "1920x1080":
-		return "832*480"
-	case "720x1280", "1080x1920":
-		return "480*832"
-	default:
-		return "832*480"
-	}
 }
 
 // Helper functions for model validation and endpoint generation

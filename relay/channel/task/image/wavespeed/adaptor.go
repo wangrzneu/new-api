@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"one-api/common"
 	"one-api/constant"
 	"one-api/dto"
 	"one-api/model"
@@ -94,6 +96,36 @@ func (a *TaskAdaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, req
 	return channel.DoTaskApiRequest(a, c, info, requestBody)
 }
 
+type UnifiedResponse struct {
+	TaskID string `json:"task_id"`
+	Data   struct {
+		TaskID string `json:"task_id"`
+	} `json:"data"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func convertToUnifiedResponse(respBody []byte) (*UnifiedResponse, error) {
+	var wsResp WavespeedImageResponse
+	err := json.Unmarshal(respBody, &wsResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	unifiedResp := UnifiedResponse{
+		TaskID: wsResp.Data.ID,
+		Data: struct {
+			TaskID string `json:"task_id"`
+		}{
+			TaskID: wsResp.Data.ID,
+		},
+		Code:    wsResp.Code,
+		Message: wsResp.Message,
+	}
+
+	return &unifiedResp, nil
+}
+
 func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (taskID string, taskData []byte, taskErr *dto.TaskError) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -108,13 +140,25 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
-	if wsResp.Status != "created" && wsResp.Status != "processing" {
-		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf("task failed with status: %s", wsResp.Status), "task_failed", http.StatusBadRequest)
+	if wsResp.Data.Status != "created" && wsResp.Data.Status != "processing" {
+		common.SysLog(fmt.Sprintf("wave raw response: %v", string(responseBody)))
+		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf("task failed with status: %s", wsResp.Data.Status), "task_failed", http.StatusBadRequest)
 		return
 	}
 
-	c.JSON(http.StatusOK, wsResp)
-	return wsResp.ID, responseBody, nil
+	unifiedResponse := UnifiedResponse{
+		TaskID: wsResp.Data.ID,
+		Data: struct {
+			TaskID string `json:"task_id"`
+		}{
+			TaskID: wsResp.Data.ID,
+		},
+		Code:    wsResp.Code,
+		Message: wsResp.Message,
+	}
+
+	c.JSON(http.StatusOK, unifiedResponse)
+	return wsResp.Data.ID, responseBody, nil
 }
 
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any) (*http.Response, error) {
@@ -143,23 +187,23 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	taskInfo.TaskID = resPayload.ID
+	taskInfo.TaskID = resPayload.Data.ID
 
-	switch resPayload.Status {
+	switch resPayload.Data.Status {
 	case "created":
 		taskInfo.Status = model.TaskStatusSubmitted
 	case "processing":
 		taskInfo.Status = model.TaskStatusInProgress
 	case "completed":
 		taskInfo.Status = model.TaskStatusSuccess
-		if len(resPayload.Outputs) > 0 {
-			taskInfo.Url = resPayload.Outputs[0]
+		if len(resPayload.Data.Outputs) > 0 {
+			taskInfo.Url = strings.Join(resPayload.Data.Outputs, ",")
 		}
 	case "failed":
 		taskInfo.Status = model.TaskStatusFailure
 		taskInfo.Reason = "Task failed"
 	default:
-		return nil, fmt.Errorf("unknown task status: %s", resPayload.Status)
+		return nil, fmt.Errorf("unknown task status: %s", resPayload.Data.Status)
 	}
 
 	return taskInfo, nil
@@ -190,13 +234,17 @@ type WavespeedImageRequest struct {
 }
 
 type WavespeedImageResponse struct {
-	ID              string            `json:"id"`
-	Model           string            `json:"model"`
-	Status          string            `json:"status"`
-	CreatedAt       string            `json:"created_at"`
-	Outputs         []string          `json:"outputs"`
-	HasNsfwContents []bool            `json:"has_nsfw_contents"`
-	URLs            map[string]string `json:"urls"`
+	Data struct {
+		ID              string            `json:"id"`
+		Model           string            `json:"model"`
+		Status          string            `json:"status"`
+		CreatedAt       string            `json:"created_at"`
+		Outputs         []string          `json:"outputs"`
+		HasNsfwContents []bool            `json:"has_nsfw_contents"`
+		URLs            map[string]string `json:"urls"`
+	} `json:"data"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func (a *TaskAdaptor) convertToImageRequestPayload(req *relaycommon.TaskSubmitReq, action string) (*WavespeedImageRequest, error) {

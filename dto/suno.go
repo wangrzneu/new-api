@@ -83,6 +83,7 @@ type TaskDto struct {
 	Action     string          `json:"action"`  // 任务类型, song, lyrics, description-mode
 	Status     string          `json:"status"`  // 任务状态, submitted, queueing, processing, success, failed
 	FailReason string          `json:"fail_reason"`
+	Outputs    []string        `json:"outputs"`
 	SubmitTime int64           `json:"submit_time"`
 	StartTime  int64           `json:"start_time"`
 	FinishTime int64           `json:"finish_time"`

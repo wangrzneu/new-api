@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
+
 	"one-api/common"
 	"one-api/constant"
 	"one-api/dto"
@@ -19,7 +21,6 @@ import (
 	"one-api/service"
 	"one-api/setting"
 	"one-api/types"
-	"strings"
 
 	"github.com/bytedance/gopkg/util/gopool"
 
@@ -390,6 +391,7 @@ func RelayTask(c *gin.Context) {
 	if err != nil {
 		return
 	}
+
 	taskErr := taskRelayHandler(c, relayInfo)
 	if taskErr == nil {
 		retryTimes = 0
@@ -428,7 +430,7 @@ func RelayTask(c *gin.Context) {
 func taskRelayHandler(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dto.TaskError {
 	var err *dto.TaskError
 	switch relayInfo.RelayMode {
-	case relayconstant.RelayModeSunoFetch, relayconstant.RelayModeSunoFetchByID, relayconstant.RelayModeVideoFetchByID:
+	case relayconstant.RelayModeSunoFetch, relayconstant.RelayModeSunoFetchByID, relayconstant.RelayModeVideoFetchByID, relayconstant.RelayModeImageAsyncFetchByID:
 		err = relay.RelayTaskFetch(c, relayInfo.RelayMode)
 	default:
 		err = relay.RelayTaskSubmit(c, relayInfo)

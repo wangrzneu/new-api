@@ -50,6 +50,10 @@ const (
 	RelayModeRealtime
 
 	RelayModeGemini
+
+	RelayModeImageAsyncSubmit
+
+	RelayModeImageAsyncFetchByID
 )
 
 func Path2RelayMode(path string) int {
@@ -64,7 +68,7 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeEmbeddings
 	} else if strings.HasPrefix(path, "/v1/moderations") {
 		relayMode = RelayModeModerations
-	} else if strings.HasPrefix(path, "/v1/images/generations") {
+	} else if strings.HasPrefix(path, "/v1/images/generations") && !strings.HasPrefix(path, "/v1/images/generations/async") {
 		relayMode = RelayModeImagesGenerations
 	} else if strings.HasPrefix(path, "/v1/images/edits") {
 		relayMode = RelayModeImagesEdits

@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
+
 	"one-api/common"
 	"one-api/constant"
 	"one-api/dto"
 	"one-api/model"
+	"one-api/relay/channel"
 	relaycommon "one-api/relay/common"
 	relayconstant "one-api/relay/constant"
+	"one-api/relay/helper"
 	"one-api/service"
 	"one-api/setting/ratio_setting"
-	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,7 +39,22 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 	}
 
 	info.InitChannelMeta(c)
-	adaptor := GetTaskAdaptor(platform)
+
+	if info != nil {
+		err := helper.ModelMappedHelper(c, info, info.Request)
+		if err != nil {
+			return service.TaskErrorWrapper(err, "model_mapped_failed", http.StatusBadRequest)
+		}
+	}
+	var adaptor channel.TaskAdaptor
+	if info.RelayMode == relayconstant.RelayModeImageAsyncSubmit || info.RelayMode == relayconstant.RelayModeImageAsyncFetchByID {
+		adaptor = GetImageTaskAdaptor(platform)
+	} else {
+		adaptor = GetTaskAdaptor(platform)
+	}
+
+	common.SysLog(fmt.Sprintf("platform: %v, relayMode: %v, info: %v", platform, info.RelayMode, info))
+
 	if adaptor == nil {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("invalid api platform: %s", platform), "invalid_api_platform", http.StatusBadRequest)
 	}
@@ -185,9 +203,10 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
-	relayconstant.RelayModeSunoFetchByID:  sunoFetchByIDRespBodyBuilder,
-	relayconstant.RelayModeSunoFetch:      sunoFetchRespBodyBuilder,
-	relayconstant.RelayModeVideoFetchByID: videoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetchByID:       sunoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetch:           sunoFetchRespBodyBuilder,
+	relayconstant.RelayModeVideoFetchByID:      videoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeImageAsyncFetchByID: imageAsyncFetchByIDRespBodyBuilder,
 }
 
 func RelayTaskFetch(c *gin.Context, relayMode int) (taskResp *dto.TaskError) {
@@ -232,7 +251,7 @@ func sunoFetchRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dto.Ta
 			return
 		}
 		for _, task := range taskModels {
-			tasks = append(tasks, TaskModel2Dto(task))
+			tasks = append(tasks, TaskModel2Dto(task, true))
 		}
 	} else {
 		tasks = make([]any, 0)
@@ -260,7 +279,7 @@ func sunoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dt
 
 	respBody, err = json.Marshal(dto.TaskResponse[any]{
 		Code: "success",
-		Data: TaskModel2Dto(originTask),
+		Data: TaskModel2Dto(originTask, true),
 	})
 	return
 }
@@ -365,14 +384,46 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 	if len(respBody) == 0 {
 		respBody, err = json.Marshal(dto.TaskResponse[any]{
 			Code: "success",
-			Data: TaskModel2Dto(originTask),
+			Data: TaskModel2Dto(originTask, false),
 		})
 	}
 	return
 }
 
-func TaskModel2Dto(task *model.Task) *dto.TaskDto {
-	return &dto.TaskDto{
+func imageAsyncFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dto.TaskError) {
+	taskId := c.Param("task_id")
+	if taskId == "" {
+		taskId = c.GetString("task_id")
+	}
+	userId := c.GetInt("id")
+
+	originTask, exist, err := model.GetByTaskId(userId, taskId)
+	if err != nil {
+		taskResp = service.TaskErrorWrapper(err, "get_task_failed", http.StatusInternalServerError)
+		return
+	}
+	if !exist {
+		taskResp = service.TaskErrorWrapperLocal(errors.New("task_not_exist"), "task_not_exist", http.StatusBadRequest)
+		return
+	}
+	// fixme
+	imageTaskData := TaskModel2Dto(originTask, false)
+	if imageTaskData.Status == "SUCCESS" {
+		imageTaskData.Status = "completed"
+	}
+	respBody, err = json.Marshal(dto.TaskResponse[any]{
+		Code: "success",
+		Data: imageTaskData,
+	})
+	return
+}
+
+func TaskModel2Dto(task *model.Task, withData bool) *dto.TaskDto {
+	outputs := make([]string, 0)
+	if task.Status == model.TaskStatusSuccess && task.FailReason != "" {
+		outputs = append(outputs, strings.Split(task.FailReason, ",")...)
+	}
+	taskDto := &dto.TaskDto{
 		TaskID:     task.TaskID,
 		Action:     task.Action,
 		Status:     string(task.Status),
@@ -381,6 +432,10 @@ func TaskModel2Dto(task *model.Task) *dto.TaskDto {
 		StartTime:  task.StartTime,
 		FinishTime: task.FinishTime,
 		Progress:   task.Progress,
-		Data:       task.Data,
+		Outputs:    outputs,
 	}
+	if withData {
+		taskDto.Data = task.Data
+	}
+	return taskDto
 }
