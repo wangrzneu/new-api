@@ -145,7 +145,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 		taskErr = service.TaskErrorWrapper(fmt.Errorf(string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
 		return
 	}
-
+	var taskID string
 	defer func() {
 		// release quota
 		if info.ConsumeQuota && taskErr == nil {
@@ -166,6 +166,9 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 				other["group_ratio"] = groupRatio
 				if hasUserGroupRatio {
 					other["user_group_ratio"] = userGroupRatio
+				}
+				if len(taskID) > 0 {
+					other["task_id"] = taskID
 				}
 				model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 					ChannelId: info.ChannelId,
