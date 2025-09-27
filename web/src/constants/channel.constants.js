@@ -164,6 +164,11 @@ export const CHANNEL_OPTIONS = [
     color: 'blue',
     label: 'WaveSpeed',
   },
+  {
+    value: 54,
+    color: 'blue',
+    label: '302AI',
+  },
 ];
 
 export const MODEL_TABLE_PAGE_SIZE = 10;

@@ -170,6 +170,11 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 				if len(taskID) > 0 {
 					other["task_id"] = taskID
 				}
+				v, exists := c.Get("task_request")
+				if exists {
+					taskReq := v.(relaycommon.TaskSubmitReq)
+					other["duration"] = taskReq.Duration
+				}
 				model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 					ChannelId: info.ChannelId,
 					ModelName: modelName,
@@ -409,11 +414,8 @@ func imageAsyncFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskRe
 		taskResp = service.TaskErrorWrapperLocal(errors.New("task_not_exist"), "task_not_exist", http.StatusBadRequest)
 		return
 	}
-	// fixme
 	imageTaskData := TaskModel2Dto(originTask, false)
-	if imageTaskData.Status == "SUCCESS" {
-		imageTaskData.Status = "completed"
-	}
+
 	respBody, err = json.Marshal(dto.TaskResponse[any]{
 		Code: "success",
 		Data: imageTaskData,

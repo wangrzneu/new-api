@@ -26,6 +26,7 @@ import (
 	"one-api/relay/channel/palm"
 	"one-api/relay/channel/perplexity"
 	"one-api/relay/channel/siliconflow"
+	imageTaskAi302 "one-api/relay/channel/task/image/ai302"
 	imageTaskWavespeed "one-api/relay/channel/task/image/wavespeed"
 	taskWavespeed "one-api/relay/channel/task/wavespeed"
 
@@ -109,6 +110,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &jimeng.Adaptor{}
 	case constant.APITypeWavespeed:
 		return &wavespeed.Adaptor{}
+	case constant.APITypeAi302:
+		return &openai.Adaptor{} // 302.ai uses OpenAI-compatible API
 	case constant.APITypeMoonshot:
 		return &moonshot.Adaptor{} // Moonshot uses Claude API
 	}
@@ -144,6 +147,8 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 			return &taskMiniMax.TaskAdaptor{}
 		case constant.ChannelTypeWavespeed:
 			return &taskWavespeed.TaskAdaptor{}
+		case constant.ChannelTypeAi302:
+			return &imageTaskAi302.TaskAdaptor{}
 		}
 	}
 	return nil
@@ -154,6 +159,8 @@ func GetImageTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 		switch channelType {
 		case constant.ChannelTypeWavespeed:
 			return &imageTaskWavespeed.TaskAdaptor{}
+		case constant.ChannelTypeAi302:
+			return &imageTaskAi302.TaskAdaptor{}
 		}
 	}
 	return nil

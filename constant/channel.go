@@ -51,6 +51,7 @@ const (
 	ChannelTypeJimeng         = 51
 	ChannelTypeVidu           = 52
 	ChannelTypeWavespeed      = 53
+	ChannelTypeAi302          = 54
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -110,4 +111,5 @@ var ChannelBaseURLs = []string{
 	"https://visual.volcengineapi.com",          //51
 	"https://api.vidu.cn",                       //52
 	"https://api.wavespeed.ai",                  //53
+	"https://api.302.ai",                        //54
 }
